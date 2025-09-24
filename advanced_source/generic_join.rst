@@ -1,49 +1,49 @@
-Distributed Training with Uneven Inputs Using the Join Context Manager
-======================================================================
+불균등한 입력에 대한 분산 학습을 위한 Join Context Manager 사용 예시
+=====================================================
 
-**Author**\ : `Andrew Gu <https://github.com/andwgu>`_
+**저자**: `Andrew Gu <https://github.com/andwgu>`_
+
+**번역**: `김민엽 <https://github.com/minyeamer>`_
+
+.. role:: python(code)
+    :language: python
 
 .. note::
-   |edit| View and edit this tutorial in `github <https://github.com/pytorch/tutorials/blob/main/advanced_source/generic_join.rst>`__.
+    |edit| 이 튜토리얼은 `github <https://github.com/pytorch/tutorials/blob/main/advanced_source/generic_join.rst>`_ 에서 확인하고 수정할 수 있습니다.
 
-.. note:: ``Join`` is introduced in PyTorch 1.10 as a prototype feature. This
-    API is subject to change.
+.. note::
+    ``Join`` 은 PyTorch 1.10에서 프로토타입 기능으로 도입되었습니다.
+    이 API는 변경될 수 있습니다.
 
-In this tutorial, you will see:
+이 튜토리얼에서는 다음을 다룹니다:
 
-- An overview of the `Join`_ context manager.
-- An example of how to use the context manager with ``DistributedDataParallel``.
-- An example of how to use the context manager with both
-  ``DistributedDataParallel`` and ``ZeroRedundancyOptimizer``.
-- An example of passing in keyword arguments to the context manager.
-- A dive into how the `Join`_ context manager works.
-- An example showing how to make a toy class compatible with the context
-  manager.
+- `Join`_ 컨텍스트 관리자(context manager) 개요
+- ``DistributedDataParallel`` 과 함께 컨텍스트 관리자를 사용하는 예시
+- ``DistributedDataParallel`` 과 ``ZeroRedundancyOptimizer`` 를 컨텍스트 관리자와 함께 사용하는 예시
+- 컨텍스트 관리자에 키워드 인자를 전달하는 예시
+- `Join`_ 컨텍스트 관리자의 동작 방식 심층 분석
+- 예제 클래스를 컨텍스트 관리자와 호환되게 만드는 방법
 
-Requirements
-------------
+필수 조건
+--------
 
-- PyTorch 1.10+
+- PyTorch 1.10 이상
 - `Getting Started with Distributed Data Parallel`_
 - `Shard Optimizer States with ZeroRedundancyOptimizer`_
 
-What is ``Join``?
------------------
-In `Getting Started with Distributed Data Parallel - Basic Use Case`_, you saw
-the general skeleton for using `DistributedDataParallel`_ to perform data
-parallel training. This implicitly schedules all-reduces in each backward pass
-to synchronize gradients across ranks. Such `collective communications
-<https://pytorch.org/docs/stable/distributed.html>`__ require participation
-from all ranks in the process group, so if a rank has fewer inputs, then the
-other ranks will hang or error (depending on the backend). More generally, this
-problem persists for any class that performs per-iteration synchronous
-collective communications.
+``Join`` 이란?
+-------------
 
-``Join`` is a context manager to be used around your per-rank training loop to
-facilitate training with uneven inputs. The context manager allows the ranks
-that exhaust their inputs early (i.e. *join* early) to shadow the collective
-communications performed by those that have not yet joined. The ways in which
-the communications are shadowed are specified by hooks.
+`Getting Started with Distributed Data Parallel - Basic Use Case`_ 에서,
+`DistributedDataParallel`_ 을 사용한 데이터 병렬 학습의 기본 구조를 살펴보았습니다.
+이 방식은 각 역전파 단계에서 모든 랭크(rank) 간에 기울기(gradient)를 동기화하기 위해 all-reduce 연산을 암묵적으로 스케줄링합니다.
+이러한 `집합통신 <https://pytorch.org/docs/stable/distributed.html>`_ 은 프로세스 그룹의 모든 랭크가 참여해야 하므로,
+만약 어떤 랭크의 입력이 더 적다면, 다른 랭크들은 대기하거나 에러가 발생할 수 있습니다.
+일반적으로, 이러한 문제는 각 반복마다 동기식 집합통신(collective communication)을 수행하는 모든 클래스에서 지속적으로 발생합니다.
+
+``Join`` 은 각 랭크의 학습 루프를 감싸서 불균등한 입력이 주어지는 상황에서 학습을 원활하게 해주는 컨텍스트 관리자입니다.
+입력이 먼저 끝난 (즉, 먼저 *Join* 된) 랭크는 아직 *Join* 되지 않은 랭크가 수행하는 집합통신을 따라가게 됩니다.
+이때 통신을 따라가는 방식은 hook 으로 지정할 수 있습니다.
 
 Using ``Join`` with ``DistributedDataParallel``
 -----------------------------------------------
